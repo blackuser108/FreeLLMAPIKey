@@ -189,6 +189,28 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(headers.get('x-routed-via')).toMatch(/^groq\//);
   });
 
+  it('forwards tool_choice.disable_parallel_tool_use as parallel_tool_calls: false', async () => {
+    let captured = mockJson(toolCompletion('get_weather', '{"city":"Karachi"}'));
+    await request(app, '/v1/messages', {
+      model: 'claude-opus-4-1', max_tokens: 128,
+      messages: [{ role: 'user', content: 'weather in Karachi?' }],
+      tools: [WEATHER_TOOL],
+      tool_choice: { type: 'auto', disable_parallel_tool_use: true },
+    }, anthropicHeaders());
+    expect(captured.body.tool_choice).toBe('auto');
+    expect(captured.body.parallel_tool_calls).toBe(false);
+
+    vi.restoreAllMocks();
+    captured = mockJson(toolCompletion('get_weather', '{"city":"Karachi"}'));
+    await request(app, '/v1/messages', {
+      model: 'claude-opus-4-1', max_tokens: 128,
+      messages: [{ role: 'user', content: 'weather in Karachi?' }],
+      tools: [WEATHER_TOOL],
+      tool_choice: { type: 'any' },
+    }, anthropicHeaders());
+    expect(captured.body).not.toHaveProperty('parallel_tool_calls');
+  });
+
   it('forwards the system prompt and tools, returns a tool_use block (stop_reason tool_use)', async () => {
     const captured = mockJson(toolCompletion('get_weather', '{"city":"Karachi"}'));
     const { status, body } = await request(app, '/v1/messages', {

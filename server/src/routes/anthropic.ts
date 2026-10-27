@@ -90,6 +90,7 @@ const anthropicToolSchema = z.object({
 const anthropicToolChoiceSchema = z.object({
   type: z.enum(['auto', 'any', 'tool', 'none']),
   name: z.string().optional(),
+  disable_parallel_tool_use: z.boolean().optional(),
 }).passthrough();
 
 const messagesSchema = z.object({
@@ -548,6 +549,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
 
   const completionOptions = {
     temperature, max_tokens, top_p, top_k: body.top_k ?? undefined, tools, tool_choice,
+    // tool_choice.disable_parallel_tool_use is OpenAI's parallel_tool_calls: false.
+    parallel_tool_calls: body.tool_choice?.disable_parallel_tool_use ? false : undefined,
     // Native `thinking: {type, budget_tokens}` → the same internal knob the
     // OpenAI surface's reasoning_effort feeds; absent when the client sent none.
     reasoning_effort: effortFromAnthropicThinking(body.thinking),
