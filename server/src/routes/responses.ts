@@ -528,6 +528,7 @@ export function buildResponseObject(opts: {
   promptTokens: number;
   completionTokens: number;
   reasoningTokens?: number;
+  cachedTokens?: number;
   metadata?: Record<string, string>;
   incompleteReason?: 'max_output_tokens' | 'content_filter';
 }) {
@@ -563,7 +564,7 @@ export function buildResponseObject(opts: {
     output_text: opts.text,
     usage: {
       input_tokens: opts.promptTokens,
-      input_tokens_details: { cached_tokens: 0 },
+      input_tokens_details: { cached_tokens: opts.cachedTokens ?? 0 },
       output_tokens: opts.completionTokens,
       output_tokens_details: { reasoning_tokens: opts.reasoningTokens ?? 0 },
       total_tokens: opts.promptTokens + opts.completionTokens,
@@ -595,6 +596,7 @@ function buildFusionResponseObject(id: string, result: FusionResult): Record<str
     promptTokens: usage?.prompt_tokens ?? 0,
     completionTokens: usage?.completion_tokens ?? 0,
     reasoningTokens: usage?.completion_tokens_details?.reasoning_tokens,
+    cachedTokens: usage?.prompt_tokens_details?.cached_tokens,
     metadata: fusionResponseMetadata(fusionResponse),
   }) as Record<string, unknown>;
 
@@ -1667,6 +1669,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       res.json(buildResponseObject({
         id: responseId, model: route.modelId, text, toolCalls,
         promptTokens, completionTokens, reasoningTokens,
+        cachedTokens: result.usage?.prompt_tokens_details?.cached_tokens,
         incompleteReason: incompleteReason(result.choices[0]?.finish_reason),
       }));
 
