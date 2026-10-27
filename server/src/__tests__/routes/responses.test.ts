@@ -264,6 +264,21 @@ describe('POST /v1/responses (#96)', () => {
     expect(completed).toContain('"output_text":"Hello"');
   });
 
+  it('stream: response.completed carries the upstream token usage', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute({
+      async chatCompletion() { throw new Error('should not be called'); },
+      async *streamChatCompletion() {
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [{ index: 0, delta: { role: 'assistant', content: 'Hello' }, finish_reason: 'stop' }] };
+        yield { id: 'c', object: 'chat.completion.chunk', created: 0, model: 'fake-model', choices: [], usage: { prompt_tokens: 1234, completion_tokens: 56, total_tokens: 1290 } };
+      },
+    }));
+
+    const { status, text } = await post(app, '/v1/responses', { input: 'hi', stream: true }, key);
+    expect(status).toBe(200);
+    const completed = JSON.parse(text.split('event: response.completed')[1].split('\n').find(l => l.startsWith('data: '))!.slice(6));
+    expect(completed.response.usage).toMatchObject({ input_tokens: 1234, output_tokens: 56, total_tokens: 1290 });
+  });
+
   it('stream: a turn cut off at the token limit ends as response.incomplete', async () => {
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() { throw new Error('should not be called'); },

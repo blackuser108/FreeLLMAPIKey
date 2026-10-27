@@ -354,6 +354,48 @@ describe('Anthropic-compatible /v1/messages', () => {
     expect(msgDelta!.data.delta.stop_reason).toBe('end_turn');
   });
 
+  it('reports the upstream token usage in the streamed message_delta', async () => {
+    const chunk = (delta: any, finish: string | null = null) => ({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [{ index: 0, delta, finish_reason: finish }] });
+    // Usage on its own choice-less frame (OpenAI include_usage shape).
+    mockStream(sse(
+      chunk({ role: 'assistant' }),
+      chunk({ content: 'Hello world' }, 'stop'),
+      { id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [], usage: { prompt_tokens: 1234, completion_tokens: 56, total_tokens: 1290 } },
+      '[DONE]',
+    ));
+    let { text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'hi' }],
+    }, anthropicHeaders());
+    let msgDelta = sseEvents(text).find(e => e.event === 'message_delta');
+    expect(msgDelta!.data.usage).toEqual({ input_tokens: 1234, output_tokens: 56 });
+
+    // Usage bundled onto the last choice frame.
+    vi.restoreAllMocks();
+    mockStream(sse(
+      chunk({ role: 'assistant' }),
+      { ...chunk({ content: 'Hi' }, 'stop'), usage: { prompt_tokens: 40, completion_tokens: 3, total_tokens: 43 } },
+      '[DONE]',
+    ));
+    ({ text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'hi' }],
+    }, anthropicHeaders()));
+    msgDelta = sseEvents(text).find(e => e.event === 'message_delta');
+    expect(msgDelta!.data.usage).toEqual({ input_tokens: 40, output_tokens: 3 });
+  });
+
+  it('keeps the estimated usage when the upstream stream reports none', async () => {
+    const chunk = (delta: any, finish: string | null = null) => ({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [{ index: 0, delta, finish_reason: finish }] });
+    mockStream(sse(chunk({ role: 'assistant' }), chunk({ content: 'Hello world' }, 'stop'), '[DONE]'));
+    const { text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'hi' }],
+    }, anthropicHeaders());
+    const msgDelta = sseEvents(text).find(e => e.event === 'message_delta');
+    expect(msgDelta!.data.usage).toEqual({ output_tokens: 3 });
+  });
+
   it('streams a buffered tool_use block (stop_reason tool_use)', async () => {
     const chunk = (delta: any, finish: string | null = null) => ({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'm', choices: [{ index: 0, delta, finish_reason: finish }] });
     mockStream(sse(

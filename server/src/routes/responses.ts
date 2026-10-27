@@ -1253,6 +1253,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
         let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
         let heldText = '';
         let upstreamFinish: string | null = null;
+        let upstreamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } } | undefined;
 
         // Commit point: headers + the response.created/in_progress skeleton go
         // out only when the first MEANINGFUL output item is about to be emitted
@@ -1346,6 +1347,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             if (anyChunk.error && !anyChunk.choices) {
               throw new Error(`in-band provider error from ${route.displayName}: ${anyChunk.error.message ?? 'provider error'}`);
             }
+
+            // Usage comes on its own choice-less frame or on the last choice
+            // frame, as on /chat/completions.
+            if (anyChunk.usage) upstreamUsage = anyChunk.usage;
 
             const choice0 = chunk.choices?.[0];
             if (choice0?.finish_reason) upstreamFinish = choice0.finish_reason;
@@ -1518,15 +1523,18 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             finalToolCalls.push({ id: acc.callId, type: 'function', function: { name: acc.name, arguments: repairedArgs } });
           }
 
+          const inputTokens = upstreamUsage?.prompt_tokens ?? estimatedInputTokens;
+          const outputTokens = upstreamUsage?.completion_tokens ?? totalOutputTokens;
           const finalResponse = buildResponseObject({
             id: responseId, model: route.modelId, text: msgText,
-            toolCalls: finalToolCalls, promptTokens: estimatedInputTokens, completionTokens: totalOutputTokens,
-            reasoningTokens: totalReasoningTokens, incompleteReason: incomplete,
+            toolCalls: finalToolCalls, promptTokens: inputTokens, completionTokens: outputTokens,
+            reasoningTokens: upstreamUsage?.completion_tokens_details?.reasoning_tokens ?? totalReasoningTokens,
+            incompleteReason: incomplete,
           });
           sse(incomplete ? 'response.incomplete' : 'response.completed', { response: finalResponse });
           res.end();
 
-          recordUpstreamSuccess(route, estimatedInputTokens + totalOutputTokens, state);
+          recordUpstreamSuccess(route, upstreamUsage?.total_tokens ?? inputTokens + outputTokens, state);
           setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           traceRouteEvent('Responses', {
             event: 'ok',
@@ -1535,10 +1543,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             platform: route.platform,
             model: route.modelId,
             latencyMs: Date.now() - start,
-            inputTokens: estimatedInputTokens,
-            outputTokens: totalOutputTokens,
+            inputTokens,
+            outputTokens,
           });
-          logRequest(route.platform, route.modelId, route.keyId, 'success', estimatedInputTokens, totalOutputTokens, Date.now() - start, null, ttfbMs, null, null, 'http');
+          logRequest(route.platform, route.modelId, route.keyId, 'success', inputTokens, outputTokens, Date.now() - start, null, ttfbMs, null, null, 'http');
           return 'done';
         } catch (streamErr: any) {
           // Client abort mid-stream: the pump's own `if (clientGone) break`
