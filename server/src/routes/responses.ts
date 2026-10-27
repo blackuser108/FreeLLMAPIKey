@@ -396,7 +396,14 @@ export function toChatMessages(req: ResponsesRequest): ChatMessage[] {
         });
         j++;
       }
-      messages.push({ role: 'assistant', content: null, tool_calls: toolCalls });
+      // A flushed search note, or an assistant message separated from these
+      // calls by a skipped reasoning item, is already the assistant turn.
+      const last = messages[messages.length - 1];
+      if (last?.role === 'assistant' && !last.tool_calls) {
+        last.tool_calls = toolCalls;
+      } else {
+        messages.push({ role: 'assistant', content: null, tool_calls: toolCalls });
+      }
       i = j - 1;
       continue;
     }
