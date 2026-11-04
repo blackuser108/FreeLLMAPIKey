@@ -1,6 +1,6 @@
 {
   "origin": "https://free-llmapi-key-rfvf-ten.vercel.app",
-  "checkedAt": "2026-11-04T05:30:08.430Z",
+  "checkedAt": "2026-11-04T05:53:57.038Z",
   "checks": [
     {
       "name": "public website",
@@ -23,11 +23,39 @@
       "status": 401
     },
     {
+      "name": "catalog requires login",
+      "status": 401
+    },
+    {
+      "name": "playground requires login",
+      "status": 401
+    },
+    {
       "name": "real admin login",
       "status": 200
     },
     {
       "name": "authenticated PostgreSQL readiness",
+      "status": 200
+    },
+    {
+      "name": "authenticated original model catalog",
+      "status": 200
+    },
+    {
+      "name": "model discovery blocks cross-origin",
+      "status": 403
+    },
+    {
+      "name": "real provider metadata rejects invalid key safely",
+      "status": 422
+    },
+    {
+      "name": "admin session survives upstream rejection",
+      "status": 200
+    },
+    {
+      "name": "LLMTr catalog clearly leaves key unchecked",
       "status": 200
     },
     {
@@ -49,8 +77,13 @@
     {
       "name": "unconfigured stream fails clearly",
       "status": 503
+    },
+    {
+      "name": "admin playground clearly reports no configured provider",
+      "status": 503
     }
   ],
   "realInference": "not_run",
+  "catalogVersion": "2026.11.03",
   "configuredModels": 0
 }

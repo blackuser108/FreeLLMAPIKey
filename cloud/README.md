@@ -9,7 +9,9 @@ Production website: **https://free-llmapi-key-rfvf-ten.vercel.app**
 OpenAI Base URL: **https://free-llmapi-key-rfvf-ten.vercel.app/v1**
 
 The public website, real admin login, authenticated database reads, invalid-key
-rejection and empty model list were verified after the database driver fix.
+rejection, signed model suggestions and provider-metadata error handling have
+been verified on the production URL. A real invalid-key metadata request to
+Groq returned a safe 422 and preserved the admin session. This is not inference.
 No upstream credential has been transferred from the local installation; the
 operator chose manual entry. Real inference remains pending until a free-tier
 provider credential/model is added. See `evidence/latest.json` for recorded checks.
@@ -141,8 +143,9 @@ sync or periodic AI probe in this edition. Some providers may have no enabled
 rows in the signed free catalog; manual IDs require checking your actual free
 entitlements. Provider metadata is intersected with this catalog (or explicit
 zero-price metadata) to avoid auto-selecting paid models. LLMTr forbids automatic
-key checks and uses signed catalog suggestions; its key stays **unchecked** until
-an explicit successful chat. A successful model-list GET is not AI verification.
+key checks and uses signed catalog suggestions; discovery reports **unchecked**.
+An explicit chat records the last inference HTTP status separately. A successful
+model-list GET is not AI verification.
 
 The admin session is a signed, 12-hour `__Host-` cookie with HttpOnly, Secure and
 SameSite=Strict. Browser writes require an exact same Origin. No passwords,
