@@ -28,3 +28,4 @@ export function providerFor(platform) {
   return new OpenAICompatProvider({ platform, name: entry[0], baseUrl: entry[1], timeoutMs: 60000, forceSingleToolCall: platform === 'nvidia' });
 }
 export { OpenAICompatProvider };
+export { catalogFor, discoverCloudModels } from './discovery.mjs';

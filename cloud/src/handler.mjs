@@ -4,6 +4,8 @@ import { Store } from './store.mjs';
 import { chatSchema, providerSchema, tokenReservation, HttpError, readJson } from './validation.mjs';
 import { cookieToken, decrypt, encrypt, secureHeaders, signSession, validSession, verifyPassword } from './security.mjs';
 import { providerFor } from './providers.mjs';
+import { catalogFor, discoverCloudModels } from './discovery.mjs';
+import catalogInfo from '../catalog-info.json' with {type:'json'};
 
 function send(res, status, data) {
   res.statusCode = status; res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -32,7 +34,7 @@ async function writeSse(res, value, signal) {
     if (signal.aborted || res.destroyed) closed();
   });
 }
-export function createHandler({ makeStore = () => new Store(), makeProvider = providerFor, env = process.env } = {}) {
+export function createHandler({ makeStore = () => new Store(), makeProvider = providerFor, discoverModels = discoverCloudModels, env = process.env } = {}) {
   return async function handler(req, res) {
     secureHeaders(res);
     const requestId = randomUUID(); res.setHeader('X-Request-Id', requestId);
@@ -43,7 +45,8 @@ export function createHandler({ makeStore = () => new Store(), makeProvider = pr
     res.once('close', onDisconnect); req.once('aborted', onDisconnect);
     let route = null; let store; let iterator;
     try {
-      const path = new URL(req.url, 'https://gateway.invalid').pathname;
+      let path = new URL(req.url, 'https://gateway.invalid').pathname;
+      let adminPlayground=false;
       if (path === '/api/health' && req.method === 'GET') {
         // Liveness is deliberately distinct from authenticated DB readiness.
         return send(res, 200, { service: 'FreeLLMAPI Cloud', version: '1', inferenceVerified: false, configured: !!env.DATABASE_URL });
@@ -63,6 +66,32 @@ export function createHandler({ makeStore = () => new Store(), makeProvider = pr
         if (!validSession(cookieToken(req), env.CLOUD_SESSION_SECRET)) throw new HttpError(401, 'Sign in to manage this gateway', 'authentication_error');
         if (req.method !== 'GET' && !sameOrigin(req)) throw new HttpError(403, 'Same-origin browser request required', 'permission_error');
         if (!await store.limit('admin-requests', 120)) throw new HttpError(429, 'Admin request limit reached', 'rate_limit_error', 60);
+        const discover=async(platform,key)=>{
+          if(!await store.limit('provider-discovery',20))throw new HttpError(429,'Hãy chờ một phút trước khi lấy lại danh sách model.','rate_limit_error',60);
+          try{return await discoverModels(platform,key,{signal:controller.signal});}
+          catch(error){
+            if([400,401,403].includes(error.status))throw new HttpError(422,'Nhà cung cấp từ chối khóa hoặc quyền truy cập. Kiểm tra đúng nhà cung cấp, quyền API và giới hạn IP/vùng.','provider_auth_error');
+            if(error.status===429)throw new HttpError(429,'Nhà cung cấp đang giới hạn yêu cầu. Hãy thử lại sau.','provider_rate_limit',60);
+            throw new HttpError(502,'Không lấy được danh sách model từ nhà cung cấp. Kiểm tra kết nối hoặc thử lại sau.','provider_connection_error');
+          }
+        };
+        if(path==='/api/catalog'&&req.method==='GET'){
+          const platform=z.enum(['groq','cerebras','google','nvidia','mistral','openrouter','huggingface','cohere','cloudflare','zhipu','llmtr']).parse(new URL(req.url,'https://gateway.invalid').searchParams.get('platform'));
+          const models=catalogFor(platform);
+          return send(res,200,{models,source:'bundled',catalog:catalogInfo,message:models.length?`Catalogue FreeLLMAPI ${catalogInfo.version}: ${models.length} model gợi ý. Chưa kiểm tra quyền của khóa hoặc gọi AI.`:'Catalogue miễn phí hiện không có model bật cho nhà cung cấp này. Chỉ nhập model thủ công nếu bạn đã xác nhận quyền dùng miễn phí.'});
+        }
+        if(path==='/api/providers/discover'&&req.method==='POST'){
+          const body=providerSchema.pick({platform:true,key:true,free_confirmed:true}).parse(await readJson(req,10000));
+          return send(res,200,await discover(body.platform,body.key));
+        }
+        if(path==='/api/providers/refresh'&&req.method==='POST'){
+          const {id}=z.object({id:z.string().uuid()}).strict().parse(await readJson(req,2048));
+          const p=await store.provider(id);if(!p)throw new HttpError(404,'Không tìm thấy khóa nhà cung cấp.');
+          const result=await discover(p.platform,decrypt(p.secret,env.CLOUD_ENCRYPTION_KEY));
+          const models=[...new Set([...p.models,...result.models.map(m=>m.id)])].slice(0,100);
+          await store.updateModels(id,models);await store.recordCheck(id,result.keyStatus,result.message);
+          return send(res,200,{...result,models:models.map(id=>({id}))});
+        }
         if (path === '/api/logout' && req.method === 'POST') {
           res.setHeader('Set-Cookie', '__Host-freellmapi=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0');
           return send(res, 200, { ok: true });
@@ -74,9 +103,12 @@ export function createHandler({ makeStore = () => new Store(), makeProvider = pr
         }
         if (path === '/api/providers' && req.method === 'POST') {
           const body = providerSchema.parse(await readJson(req, 100000));
+          const discovery=body.models.length?null:await discover(body.platform,body.key);
+          if(discovery){body.models=discovery.models.map(m=>m.id);if(!body.models.length)throw new HttpError(422,discovery.message,'provider_models_empty');}
           if (body.platform === 'openrouter' && body.models.some(m => !m.endsWith(':free'))) throw new HttpError(400, 'Cloud OpenRouter routes must use :free model IDs');
           const out = await store.addProvider(body, encrypt(body.key, env.CLOUD_ENCRYPTION_KEY));
-          return send(res, 201, { id: out.id });
+          if(discovery)await store.recordCheck(out.id,discovery.keyStatus,discovery.message);
+          return send(res, 201, { id: out.id,models:body.models,discovery });
         }
         if (path === '/api/providers/toggle' && req.method === 'POST') {
           const body = z.object({ id: z.string().uuid(), enabled: z.boolean() }).strict().parse(await readJson(req, 2048));
@@ -91,13 +123,14 @@ export function createHandler({ makeStore = () => new Store(), makeProvider = pr
           const { id } = z.object({ id: z.string().uuid() }).strict().parse(await readJson(req, 2048));
           await store.revokeAccessKey(id); return send(res, 200, { ok: true });
         }
-        throw new HttpError(404, 'Unknown management endpoint');
+        if(path==='/api/playground'&&req.method==='POST'){adminPlayground=true;path='/v1/chat/completions';}
+        else throw new HttpError(404, 'Unknown management endpoint');
       }
       if (path !== '/v1/models' && path !== '/v1/chat/completions') throw new HttpError(404, 'Supported endpoints: GET /v1/models, POST /v1/chat/completions');
       // Invalid keys never reach provider selection or upstream transport.
-      if (!bearer(req)) throw new HttpError(401, 'API key required', 'authentication_error');
-      if (!await store.limit('auth-attempts', 300)) throw new HttpError(429, 'Authentication request limit reached', 'rate_limit_error',60);
-      const identity = await store.authenticate(bearer(req));
+      if (!adminPlayground&&!bearer(req)) throw new HttpError(401, 'API key required', 'authentication_error');
+      if (!adminPlayground&&!await store.limit('auth-attempts', 300)) throw new HttpError(429, 'Authentication request limit reached', 'rate_limit_error',60);
+      const identity = adminPlayground?'admin-playground':await store.authenticate(bearer(req));
       if (!identity) throw new HttpError(401, 'Invalid API key', 'authentication_error');
       const rpm = bounded(env.CLOUD_API_RPM,20,1,120);
       if (!await store.limit(`api:${identity}`,rpm)) throw new HttpError(429, 'API request limit reached', 'rate_limit_error',60);

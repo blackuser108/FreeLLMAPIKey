@@ -99,9 +99,14 @@ export class Store {
     });
   }
   async providers() {
-    return this.db`select id,platform,label,models,enabled,free_confirmed,priority,rpm,rpd,tpm,tpd,concurrency,last_status,
+    return this.db`select id,platform,label,models,enabled,free_confirmed,priority,rpm,rpd,tpm,tpd,concurrency,last_status,health_status,checked_at,check_message,
       case when cooldown_until > now() then cooldown_until else null end as cooldown_until
       from freellmapi.providers order by priority,created_at`;
+  }
+  async provider(id) { const [row]=await this.db`select * from freellmapi.providers where id=${id}`;return row; }
+  async updateModels(id, models) { await this.db`update freellmapi.providers set models=${models} where id=${id}`; }
+  async recordCheck(id, status, message) {
+    await this.db`update freellmapi.providers set health_status=${status},check_message=${message},checked_at=now() where id=${id}`;
   }
   async addProvider(p, secret) {
     const [row] = await this.db`insert into freellmapi.providers(platform,label,secret,models,free_confirmed,priority,rpm,rpd,tpm,tpd,concurrency)

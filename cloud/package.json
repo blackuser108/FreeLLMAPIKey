@@ -6,6 +6,7 @@
     "node": "24.x"
   },
   "scripts": {
+    "catalog:update": "node scripts/refresh-catalog.mjs",
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.mjs",
     "lint": "node ../node_modules/eslint/bin/eslint.js --config eslint.config.mjs src scripts test public/app.js",

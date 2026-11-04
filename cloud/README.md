@@ -39,6 +39,8 @@ and management data always use PostgreSQL, never a fake SQLite handle.
 | OpenAI chat | `POST /v1/chat/completions`, including tools and supported sampling/JSON options |
 | Streaming | SSE chunks, `[DONE]`, backpressure and disconnect cancellation |
 | Models | Authenticated `GET /v1/models`; lists configured IDs, not a claim they were live-probed |
+| Model setup | Original signed free monthly catalog suggestions, authenticated provider-list discovery, automatic model selection when saving without manual IDs |
+| Management tests | Cookie-authenticated chat/SSE playground; no separate cloud key needed; each test is an explicit AI request |
 | Routing | `auto`: priority then least recently used; explicit ID never falls back to a different model |
 | Fallback | At most 3 credential attempts, only before any stream chunk is sent to the client |
 | Provider limits | Shared credential-wide RPM/RPD/TPM/TPD and concurrency in PostgreSQL |
@@ -112,12 +114,35 @@ There is no attempt to merge output from different providers after streaming sta
 ## Management and security
 
 1. Open the deployed website and sign in with the privately supplied password.
-2. Add a provider key and exact free model IDs. Set limits at or below those of
+2. Add a provider key; leave model IDs blank for automatic discovery, or use
+   “Kiểm tra khóa & lấy model” before saving. Manual IDs remain available when
+   you have independently confirmed free access. Set limits at or below those of
    your actual account. Defaults are conservative application guardrails, not
    verified provider entitlements. Shared accounts across local/cloud installs
    also share the provider's actual allowance.
 3. Create a cloud client key and place it in each calling project's server env.
 4. Use the playground only when you intend to send real AI requests.
+
+Model discovery reads metadata only. `POST /api/providers/discover` checks a
+submitted key against the provider's model API where supported; it does not save
+the key or generate tokens. A rejected upstream key returns **422** with
+`provider_auth_error`, not an admin-session 401. `POST /api/providers/refresh`
+uses the saved encrypted credential and adds discovered models while preserving
+manual entries. Both require an admin cookie and same-origin request.
+`POST /api/playground` uses the same router, quotas, adapters and SSE pipeline as
+the public API, authenticated with the admin cookie instead of a client key.
+
+`catalog.json` is a snapshot of the original **public monthly** FreeLLMAPI
+catalog. `npm --prefix cloud run catalog:update` verifies the original pinned
+Ed25519 signature before replacing it; it sends no provider key or license.
+The source/version is shown in the UI. Refresh the snapshot, review the diff,
+then rebuild/redeploy to publish a newer catalog. There is no background catalog
+sync or periodic AI probe in this edition. Some providers may have no enabled
+rows in the signed free catalog; manual IDs require checking your actual free
+entitlements. Provider metadata is intersected with this catalog (or explicit
+zero-price metadata) to avoid auto-selecting paid models. LLMTr forbids automatic
+key checks and uses signed catalog suggestions; its key stays **unchecked** until
+an explicit successful chat. A successful model-list GET is not AI verification.
 
 The admin session is a signed, 12-hour `__Host-` cookie with HttpOnly, Secure and
 SameSite=Strict. Browser writes require an exact same Origin. No passwords,

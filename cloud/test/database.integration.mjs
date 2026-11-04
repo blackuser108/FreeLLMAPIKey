@@ -12,6 +12,11 @@ test('real PostgreSQL serializes quotas, shared cooldown, leases and auth',async
   assert.equal(await one.authenticate('invalid-key-xxxxxxxxxxxx'),null);
   const [providers,keys,stats]=await Promise.all([one.providers(),one.accessKeys(),one.stats()]);
   assert.ok(Array.isArray(providers));assert.ok(Array.isArray(keys));assert.equal(typeof stats.attempts,'number');
+  await one.recordCheck(id,'catalog_checked','Danh sách đã được đọc; chưa thử chat.');
+  await one.updateModels(id,[model,'extra-'+model]);
+  const provider=await two.provider(id);assert.ok(provider.models.includes('extra-'+model));
+  const listed=(await two.providers()).find(p=>p.id===id);
+  assert.equal(listed.health_status,'catalog_checked');assert.ok(listed.checked_at);assert.equal(Object.hasOwn(listed,'secret'),false);
   const attempts=await Promise.all(Array.from({length:12},(_,i)=>(i%2?one:two).limit(bucket,3)));
   assert.equal(attempts.filter(Boolean).length,3,'atomic rate counter allows exactly the shared budget');
   const leases=await Promise.all([one.reserve(model,100),two.reserve(model,100)]);

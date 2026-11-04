@@ -25,7 +25,7 @@ export const chatSchema = z.object({
 export const providerSchema = z.object({
   platform: z.enum(['groq','cerebras','google','nvidia','mistral','openrouter','huggingface','cohere','cloudflare','zhipu','llmtr']),
   label: z.string().trim().min(1).max(80), key: z.string().trim().min(8).max(4096),
-  models: z.array(z.string().trim().min(1).max(200)).min(1).max(100),
+  models: z.array(z.string().trim().min(1).max(200)).max(100).default([]),
   free_confirmed: z.literal(true), priority: z.number().int().min(1).max(1000).default(100),
   rpm: z.number().int().min(1).max(10000).default(10), rpd: z.number().int().min(1).max(1000000).default(100),
   tpm: z.number().int().min(1).max(10000000).default(10000), tpd: z.number().int().min(1).max(100000000).default(100000),

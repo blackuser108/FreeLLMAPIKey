@@ -36,3 +36,4 @@ cloud/dist/
 cloud/scripts/dist-handler.mjs
 cloud/dist-handler.mjs
 cloud/dist-providers.mjs
+cloud/scripts/*.generated.mjs

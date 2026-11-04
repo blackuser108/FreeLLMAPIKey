@@ -27,6 +27,9 @@ create table freellmapi.providers (
   cooldown_until timestamptz not null default '-infinity',
   last_used_at timestamptz not null default '-infinity',
   last_status integer,
+  health_status text not null default 'unchecked' check (health_status in ('unchecked','catalog_checked')),
+  checked_at timestamptz,
+  check_message text,
   created_at timestamptz not null default now()
 );
 create table freellmapi.attempts (
