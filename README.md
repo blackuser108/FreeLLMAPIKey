@@ -2,6 +2,9 @@
 
 # FreeLLMAPI
 
+> **Cloud edition in this repository:** [Vercel + Supabase setup, API examples and supported scope](cloud/README.md).
+> The cloud build provides real chat/streaming with PostgreSQL coordination; the original local/desktop documentation below describes a broader feature set.
+
 **7.4 billion tokens per month.  34 free LLM providers. 635 free model endpoints. One OpenAI-compatible endpoint.**
 
 Aggregate free tiers from dozens of providers, plus custom OpenAI-compatible chat, embedding, image, and audio endpoints, behind a single `/v1` API. Keys are stored encrypted. A router picks the best available model for each request, falls over to the next provider when one is rate-limited, and tracks per-key usage so you stay under every free-tier cap.

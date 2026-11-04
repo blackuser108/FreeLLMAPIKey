@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --ignore-scripts --no-audit --no-fund && npm --prefix cloud ci --ignore-scripts --no-audit --no-fund",
+  "buildCommand": "npm --prefix cloud run build"
+}

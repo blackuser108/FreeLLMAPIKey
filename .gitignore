@@ -25,3 +25,14 @@ update-hermes.sh
 
 # Monetization planning — private, never committed
 monetization/
+
+# Cloud credentials and generated deployment output
+.cloud-private/
+.env.*
+!.env.example
+.vercel/
+cloud/node_modules/
+cloud/dist/
+cloud/scripts/dist-handler.mjs
+cloud/dist-handler.mjs
+cloud/dist-providers.mjs
