@@ -4,6 +4,16 @@ This is the cloud chat edition of the existing FreeLLMAPI source. It runs its
 **real provider adapters**, not the Electron binary or a mock service. The local
 installation is independent and keeps its own database and access key.
 
+Production website: **https://free-llmapi-key-rfvf-ten.vercel.app**
+
+OpenAI Base URL: **https://free-llmapi-key-rfvf-ten.vercel.app/v1**
+
+The public website, real admin login, authenticated database reads, invalid-key
+rejection and empty model list were verified after the database driver fix.
+No upstream credential has been transferred from the local installation; the
+operator chose manual entry. Real inference remains pending until a free-tier
+provider credential/model is added. See `evidence/latest.json` for recorded checks.
+
 ## What runs where
 
 - Vercel: management website and one streaming Node.js 24 Function.

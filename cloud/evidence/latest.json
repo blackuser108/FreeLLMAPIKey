@@ -1,0 +1,56 @@
+{
+  "origin": "https://free-llmapi-key-rfvf-ten.vercel.app",
+  "checkedAt": "2026-11-04T05:30:08.430Z",
+  "checks": [
+    {
+      "name": "public website",
+      "status": 200
+    },
+    {
+      "name": "public liveness",
+      "status": 200
+    },
+    {
+      "name": "missing API key",
+      "status": 401
+    },
+    {
+      "name": "incorrect API key",
+      "status": 401
+    },
+    {
+      "name": "admin requires login",
+      "status": 401
+    },
+    {
+      "name": "real admin login",
+      "status": 200
+    },
+    {
+      "name": "authenticated PostgreSQL readiness",
+      "status": 200
+    },
+    {
+      "name": "admin cross-origin write blocked",
+      "status": 403
+    },
+    {
+      "name": "authenticated model list",
+      "status": 200
+    },
+    {
+      "name": "arbitrary upstream rejected",
+      "status": 400
+    },
+    {
+      "name": "unconfigured chat fails clearly",
+      "status": 503
+    },
+    {
+      "name": "unconfigured stream fails clearly",
+      "status": 503
+    }
+  ],
+  "realInference": "not_run",
+  "configuredModels": 0
+}

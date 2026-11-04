@@ -102,6 +102,7 @@ export function createHandler({ makeStore = () => new Store(), makeProvider = pr
       const rpm = bounded(env.CLOUD_API_RPM,20,1,120);
       if (!await store.limit(`api:${identity}`,rpm)) throw new HttpError(429, 'API request limit reached', 'rate_limit_error',60);
       if (!await store.limit('gateway-daily',1000,86400)) throw new HttpError(429, 'Gateway daily request budget reached', 'rate_limit_error',3600);
+      await store.maintenance();
       if (path === '/v1/models' && req.method === 'GET') {
         const ids = await store.models();
         return send(res,200,{ object:'list', data:[...(ids.length ? ['auto'] : []), ...ids].map(id=>({ id, object:'model', created:0, owned_by:'freellmapi-cloud' })) });
