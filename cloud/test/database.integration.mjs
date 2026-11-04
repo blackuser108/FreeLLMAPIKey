@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { Store, databaseTls } from '../src/store.mjs';
-const options={ssl:databaseTls,prepare:false,max:1,connect_timeout:10,onnotice:()=>{}};
+const options={ssl:databaseTls,prepare:false,max:1,max_pipeline:1,connect_timeout:10,onnotice:()=>{}};
 const a=postgres(process.env.DATABASE_URL,options);const b=postgres(process.env.DATABASE_URL,options);
 const one=new Store(a),two=new Store(b);const id=randomUUID();const model='test-'+id;const bucket='test-'+id;
 test('real PostgreSQL serializes quotas, shared cooldown, leases and auth',async t=>{

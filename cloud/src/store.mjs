@@ -10,10 +10,29 @@ export function database() {
   if (!process.env.DATABASE_URL) throw new Error('Database not configured');
   // Supavisor transaction mode: no prepared statements, 1 connection per instance.
   // https://supabase.com/docs/guides/database/connecting-to-postgres
-  return sql ||= postgres(process.env.DATABASE_URL, { ssl: databaseTls, max: 1, prepare: false, idle_timeout: 20, connect_timeout: 8, connection: { statement_timeout: 8000 }, onnotice: () => {} });
+  return sql ||= postgres(process.env.DATABASE_URL, { ssl: databaseTls, max: 1, max_pipeline: 1, prepare: false, idle_timeout: 5, max_lifetime: 60, connect_timeout: 8, connection: { statement_timeout: 8000, application_name:'freellmapi-cloud' }, onnotice: () => {} });
 }
 export class Store {
-  constructor(db = database()) { this.db = db; }
+  constructor(db = database()) {
+    this.db = db;
+    // Supavisor transaction pooling does not support query pipelining. Also
+    // bound the WHOLE operation (including waiting for a connection), rather
+    // than relying only on connect_timeout / server-side statement_timeout.
+    // https://supabase.com/docs/guides/database/postgres-js
+    return new Proxy(this,{get(target,name,receiver){
+      const value=Reflect.get(target,name,receiver);
+      if(typeof value!=='function'||name==='constructor')return value;
+      return (...args)=>{
+        let timer;
+        const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{
+          const error=new Error('Database operation deadline');error.code='DB_DEADLINE';reject(error);
+          if(sql===db)sql=null;
+          db.end({timeout:0}).catch(()=>{});
+        },12000);});
+        return Promise.race([Promise.resolve().then(()=>value.apply(target,args)),timeout]).finally(()=>clearTimeout(timer));
+      };
+    }});
+  }
   async ping() { await this.db`select 1`; }
   async authenticate(key) {
     if (typeof key !== 'string' || key.length < 20 || key.length > 200) return null;

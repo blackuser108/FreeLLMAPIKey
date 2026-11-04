@@ -186,7 +186,11 @@ Create a login role `freellmapi_runtime` with a strong generated password, grant
 CONNECT, USAGE on schema `freellmapi`, CRUD on its tables, and an RLS policy for
 that role on each table. Do not grant privileges to browser/anon roles.
 Use the exact transaction-pooler hostname from Supabase's Connect dialog, port
-6543 and username `freellmapi_runtime.PROJECT_REF`. No prepared statements.
+6543 and username `freellmapi_runtime.PROJECT_REF`. No prepared statements, one
+connection per instance, `max_pipeline: 1`. Supavisor transaction mode does not
+support query pipelining; using the Postgres.js default can hang requests.
+Database operations have a 12s wall-clock ceiling, after which the connection is
+discarded and the request fails closed, allowing a new connection next time.
 
 Set the four variables in `cloud/.env.example` as Vercel **server secrets**:
 `DATABASE_URL`, `CLOUD_ENCRYPTION_KEY`, `CLOUD_SESSION_SECRET`,

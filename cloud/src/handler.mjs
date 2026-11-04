@@ -173,7 +173,7 @@ export function createHandler({ makeStore = () => new Store(), makeProvider = pr
       const type=known ? error.type : error instanceof z.ZodError ? 'invalid_request_error' : 'service_unavailable';
       // Log classifications only: never provider messages, credentials, prompt,
       // SQL parameters, connection strings or stack traces.
-      if (!known && !(error instanceof z.ZodError)) console.error(JSON.stringify({ event:'gateway_failure', requestId, code:'internal_dependency_error' }));
+      if (!known && !(error instanceof z.ZodError)) console.error(JSON.stringify({ event:'gateway_failure', requestId, code: /^[A-Z_]{1,50}$/.test(error.code || '') ? error.code : 'internal_dependency_error' }));
       const data={ error:{ message, type, request_id:requestId } };
       if (!res.destroyed && !res.writableEnded) {
         if (res.headersSent) { res.write(`data: ${JSON.stringify(data)}\n\n`); res.end(); }

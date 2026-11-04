@@ -2,7 +2,7 @@
 const el=id=>document.getElementById(id);
 const base=location.origin+'/v1';
 el('base-url').textContent=base;
-el('curl-example').textContent=`curl "${base}/chat/completions" \\\n+  -H "Authorization: Bearer $FREELLMAPI_API_KEY" \\\n+  -H "Content-Type: application/json" \\\n+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":true}'`;
+el('curl-example').textContent=`curl "${base}/chat/completions" \\\n  -H "Authorization: Bearer $FREELLMAPI_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"auto","messages":[{"role":"user","content":"Hello"}],"stream":true}'`;
 function notice(message,error=false){el('notice').hidden=false;el('notice').className=error?'error':'';el('notice').textContent=message;}
 async function api(path,body){
   const res=await fetch(path,{method:body?'POST':'GET',credentials:'same-origin',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
