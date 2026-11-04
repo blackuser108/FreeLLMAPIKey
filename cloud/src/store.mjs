@@ -1,4 +1,5 @@
-import postgres from 'postgres';
+import { createDatabase } from './postgres.mjs';
+export { createDatabase } from './postgres.mjs';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { digest } from './security.mjs';
@@ -8,9 +9,9 @@ let sql;
 export const databaseTls = { rejectUnauthorized: true, ca: typeof __SUPABASE_CA__ !== 'undefined' ? __SUPABASE_CA__ : readFileSync(new URL('../supabase-ca.pem',import.meta.url),'utf8') };
 export function database() {
   if (!process.env.DATABASE_URL) throw new Error('Database not configured');
-  // Supavisor transaction mode: no prepared statements, 1 connection per instance.
+  // Supavisor transaction mode: unnamed parameterized queries, 1 connection per instance.
   // https://supabase.com/docs/guides/database/connecting-to-postgres
-  return sql ||= postgres(process.env.DATABASE_URL, { ssl: databaseTls, max: 1, max_pipeline: 1, prepare: false, idle_timeout: 5, max_lifetime: 60, connect_timeout: 8, connection: { statement_timeout: 8000, application_name:'freellmapi-cloud' }, onnotice: () => {} });
+  return sql ||= createDatabase(process.env.DATABASE_URL,databaseTls);
 }
 export class Store {
   constructor(db = database()) {
@@ -18,7 +19,7 @@ export class Store {
     // Supavisor transaction pooling does not support query pipelining. Also
     // bound the WHOLE operation (including waiting for a connection), rather
     // than relying only on connect_timeout / server-side statement_timeout.
-    // https://supabase.com/docs/guides/database/postgres-js
+    // https://node-postgres.com/apis/pool
     return new Proxy(this,{get(target,name,receiver){
       const value=Reflect.get(target,name,receiver);
       if(typeof value!=='function'||name==='constructor')return value;

@@ -186,9 +186,12 @@ Create a login role `freellmapi_runtime` with a strong generated password, grant
 CONNECT, USAGE on schema `freellmapi`, CRUD on its tables, and an RLS policy for
 that role on each table. Do not grant privileges to browser/anon roles.
 Use the exact transaction-pooler hostname from Supabase's Connect dialog, port
-6543 and username `freellmapi_runtime.PROJECT_REF`. No prepared statements, one
-connection per instance, `max_pipeline: 1`. Supavisor transaction mode does not
-support query pipelining; using the Postgres.js default can hang requests.
+6543 and username `freellmapi_runtime.PROJECT_REF`. The `pg` driver uses unnamed
+parameterized statements and one connection per instance, with pipelining off.
+Transactions acquire one client for their entire BEGIN/COMMIT/ROLLBACK sequence.
+The cloud query tag only converts interpolated values to `$n` parameters; it does
+not rewrite SQL. The first Postgres.js implementation hung on concurrent
+management reads and was replaced; regression tests cover that exact scenario.
 Database operations have a 12s wall-clock ceiling, after which the connection is
 discarded and the request fails closed, allowing a new connection next time.
 
@@ -251,7 +254,7 @@ upstream. `test:database` checks real Supabase transactions using isolated UUID
 rows removed afterward. Neither constitutes a real paid/free AI inference test.
 
 Cloud dependency audit is separate from the legacy monorepo audit. The cloud
-bundle includes postgres, patched zod/fast-uri and the original adapter's AJV
+bundle includes node-postgres, patched zod/fast-uri and the original adapter's AJV
 helpers; unrelated legacy Express/Vite/CLI/media advisories are not claimed fixed.
 Review and patch the full monorepo separately before exposing other surfaces.
 

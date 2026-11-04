@@ -2,16 +2,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import postgres from 'postgres';
-import { Store, databaseTls } from '../src/store.mjs';
-const options={ssl:databaseTls,prepare:false,max:1,max_pipeline:1,connect_timeout:10,onnotice:()=>{}};
-const a=postgres(process.env.DATABASE_URL,options);const b=postgres(process.env.DATABASE_URL,options);
+import { Store, databaseTls, createDatabase } from '../src/store.mjs';
+const a=createDatabase(process.env.DATABASE_URL,databaseTls);const b=createDatabase(process.env.DATABASE_URL,databaseTls);
 const one=new Store(a),two=new Store(b);const id=randomUUID();const model='test-'+id;const bucket='test-'+id;
 test('real PostgreSQL serializes quotas, shared cooldown, leases and auth',async t=>{
   t.after(async()=>{await a`delete from freellmapi.providers where id=${id}`;await a`delete from freellmapi.rate_buckets where id=${bucket}`;await Promise.all([a.end(),b.end()]);});
   await a`insert into freellmapi.providers(id,platform,label,secret,models,free_confirmed,rpm,rpd,tpm,tpd,concurrency)
     values(${id},'groq',${model},${a.json({test:true})},${[model]},true,2,3,1000,2000,1)`;
   assert.equal(await one.authenticate('invalid-key-xxxxxxxxxxxx'),null);
+  const [providers,keys,stats]=await Promise.all([one.providers(),one.accessKeys(),one.stats()]);
+  assert.ok(Array.isArray(providers));assert.ok(Array.isArray(keys));assert.equal(typeof stats.attempts,'number');
   const attempts=await Promise.all(Array.from({length:12},(_,i)=>(i%2?one:two).limit(bucket,3)));
   assert.equal(attempts.filter(Boolean).length,3,'atomic rate counter allows exactly the shared budget');
   const leases=await Promise.all([one.reserve(model,100),two.reserve(model,100)]);

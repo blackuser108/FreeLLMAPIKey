@@ -12,7 +12,7 @@ await mkdir(func,{recursive:true});
 const result = await build({ entryPoints:[fileURLToPath(new URL('../src/handler.mjs',import.meta.url))], outfile:fileURLToPath(new URL('index.mjs',func)),
   bundle:true,platform:'node',target:'node24',format:'esm',sourcemap:false,
   metafile:true,alias:cloudAliases,define:cloudDefines,
-  external:['better-sqlite3','sharp','undici','socks-proxy-agent'],
+  external:['better-sqlite3','sharp','undici','socks-proxy-agent','pg-native'],
   banner:{js:"import { createRequire as cloudCreateRequire } from 'node:module'; const require = cloudCreateRequire(import.meta.url);"},
 });
 await mkdir(new URL('../dist/',import.meta.url),{recursive:true});
